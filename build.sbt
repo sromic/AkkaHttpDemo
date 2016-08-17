@@ -1,4 +1,4 @@
-lazy val root = (project in file(".")).enablePlugins(JavaAppPackaging)
+lazy val root = (project in file(".")).enablePlugins(JavaAppPackaging, DockerPlugin)
 name := "AkkaHttpDemo"
 
 version := "1.0"
