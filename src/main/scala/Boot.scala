@@ -69,7 +69,7 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
         get {
           implicit val timeout: Timeout = 5.seconds
 
-          val bids: Future[Bids] = (auction ? GetBids).mapTo[Bids]
+          val bids: Future[Bids] = (auction ? GetBids)(timeout).mapTo[Bids]
 
           complete(bids)
         }
