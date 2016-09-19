@@ -1,7 +1,10 @@
 import java.io.File
 
+import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.http.impl.util.JavaAccessors
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.common.{JsonEntityStreamingSupport, EntityStreamingSupport}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
@@ -27,8 +30,12 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
 
+  // Note that the default support renders the Source as JSON Array
+  implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json().withParallelMarshalling(parallelism = 8, unordered = false)
 
   val auction = system.actorOf(Auction.props, "auction")
+
+  lazy val getBidsList = (1 to 100000) map (i => Bid(s"$i", i)) toList
 
   val numbers = Source.fromIterator(() =>
     Iterator.continually(Random.nextInt()))
@@ -53,7 +60,7 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
       } ~
       pathPrefix("resources") {
         pathEndOrSingleSlash {
-          getFromBrowseableDirectories(s"C:\\tmp\\")
+          getFromBrowseableDirectory(s"C:\\tmp\\")
         } ~
           path("spark" /) {
             getFromBrowseableDirectories(s"C:\\tmp\\spark")
@@ -83,8 +90,17 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
         get {
             getFromFile(file)
         }
-      }
+      } ~
+      path("bids") {
+        val bids: Source[Bid, NotUsed] = Source(getBidsList)
+        complete(bids)
+      } ~
+      path("obids") {
+        val bidList = getBidsList
+        val bids = Bids(bidList)
 
+        complete(bids)
+      }
 
   val bindingFuture = Http().bindAndHandle(route, "localhost", 9080)
 
