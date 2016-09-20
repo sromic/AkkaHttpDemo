@@ -22,7 +22,8 @@ dockerExposedPorts := Seq(8000)
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-experimental" % "2.4.9-RC2",
-  "com.typesafe.akka" %% "akka-http-spray-json-experimental" % "2.4.9-RC2"
+  "com.typesafe.akka" %% "akka-http-spray-json-experimental" % "2.4.9-RC2",
+  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.10"
 )
 
 unmanagedResourceDirectories in Compile += {

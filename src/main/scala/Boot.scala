@@ -6,10 +6,11 @@ import akka.http.impl.util.JavaAccessors
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.common.{JsonEntityStreamingSupport, EntityStreamingSupport}
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage, Message}
 import akka.http.scaladsl.server.Directives._
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Flow, Source}
 import akka.util.{ByteString, Timeout}
 import auction.Auction.{Bid, Bids, GetBids}
 import auction.{Auction, JsonSupport}
@@ -36,6 +37,16 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
   val auction = system.actorOf(Auction.props, "auction")
 
   lazy val getBidsList = (1 to 100000) map (i => Bid(s"$i", i)) toList
+
+  def greeter: Flow[Message, Message, Any] =
+    Flow[Message].mapConcat {
+      case tm: TextMessage =>
+        TextMessage(Source.single("Hello ") ++ tm.textStream ++ Source.single("!")) :: Nil
+      case bm: BinaryMessage =>
+        // ignore binary messages but drain content to avoid the stream being clogged
+        bm.dataStream.runWith(Sink.ignore)
+        Nil
+    }
 
   val numbers = Source.fromIterator(() =>
     Iterator.continually(Random.nextInt()))
@@ -100,6 +111,9 @@ object Boot extends App with JsonSupport with GlobalExceptionHandler {
         val bids = Bids(bidList)
 
         complete(bids)
+      } ~
+      path("ws") {
+        handleWebSocketMessages(greeter)
       }
 
   val bindingFuture = Http().bindAndHandle(route, "localhost", 9080)
