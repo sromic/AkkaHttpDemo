@@ -2,10 +2,15 @@ package auction.graphs
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.{ClosedShape, ActorMaterializer}
+import akka.stream.{ActorAttributes, Supervision, ClosedShape, ActorMaterializer}
 import akka.stream.scaladsl._
+import ActorAttributes.supervisionStrategy
+import Supervision.resumingDecider
+import akka.util.Timeout
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+import scala.util.{Try, Random}
 
 /**
  * Created by simun on 20.9.2016..
@@ -15,7 +20,11 @@ object RunnableGraphsDemo extends App {
   implicit val system = ActorSystem("graphs")
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(1 second)
 
+  /**
+   * creating graph and getting materialized value from it
+   */
   val in = Source(1 to 100)
   val out = Sink.fold[Int, Int](0)(_ + _ )
 
@@ -42,5 +51,36 @@ object RunnableGraphsDemo extends App {
     println(expectedValue == result)
   }
 
-  system terminate() foreach println
+  /**
+   * combining sources
+   */
+  val source1 = Source(List(1,2, 3))
+  val source2 = Source(List(1,2, 3))
+
+  val merged = Source.combine(source1, source2)(Merge(_))
+  merged.runWith(out) foreach println
+
+  /**
+   * Exception handling ''resumingDecider'' for supervisorStrategy is used in order to drop Failure and continue with processing
+   */
+
+  def futureOperation(): Future[Int] = Future {
+    val random = Random.nextInt(1000)
+    random %2 == 0 match {
+      case true => random
+      case false => throw new ArithmeticException("some error")
+    }
+  }
+
+  val futureIntFlow = Source(1 to 100).via(Flow[Int].mapAsync(4) { value => futureOperation() }).withAttributes(supervisionStrategy(resumingDecider))
+  val futureResult: Future[Int] = futureIntFlow runWith(out)
+  futureResult map { sum =>
+    println(sum)
+    sum
+  } andThen { case sum: Try[Int] => system.terminate() }
+
+  /**
+   * close program on finish
+   */
+  Await.result(futureResult, timeout.duration)
 }
