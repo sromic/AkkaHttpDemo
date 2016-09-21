@@ -1,5 +1,5 @@
 lazy val root = (project in file(".")).enablePlugins(JavaAppPackaging, DockerPlugin)
-name := "AkkaHttpDemo"
+name := "akka-http-docker"
 
 version := "1.0"
 
@@ -17,13 +17,22 @@ scalacOptions ++= Seq(
   "-Ywarn-unused"
 )
 
-packageName in Docker := "akka-http-docker"
-dockerExposedPorts := Seq(8000)
+mainClass in (Compile, run) := Some("Boot")
+
+daemonUser.in(Docker) := "root"
+maintainer.in(Docker) := "Simun Romic"
+version.in(Docker)    := "latest"
+dockerBaseImage       := "java:8"
+dockerExposedPorts    := Vector(2552, 8080)
+dockerRepository      := Some("sromic")
+
+resolvers += "krasserm at bintray" at "http://dl.bintray.com/krasserm/maven"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-experimental" % "2.4.9-RC2",
   "com.typesafe.akka" %% "akka-http-spray-json-experimental" % "2.4.9-RC2",
-  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.10"
+  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.10",
+  "com.typesafe.akka" % "akka-persistence-cassandra_2.11" % "0.18"
 )
 
 unmanagedResourceDirectories in Compile += {
